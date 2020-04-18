@@ -8,26 +8,29 @@ from sensor_msgs.msg import LaserScan
 from geometry_msgs.msg import Twist
 from nav_msgs.msg import Odometry
 from tf import transformations
-from std_srvs.srv import *
 from tf.transformations import euler_from_quaternion
 
 #declare global variables
 velocity_publisher_ = None
 laser_subscriber_ = None
 odom_subscriber_ = None
+
 forward_speed_ = 0.18
-right_wall_distance_ = 0
+
 current_distance_ = 0
+
 state_ = 0
+
 t0_ = None
 t1_ = None
-move_count_ = 0
-stop_count_ = 0
-initial_stage_ = True
+
 roll_ = pitch_ = yaw_ = 0.0
-target_angle_ = 90
-kP_ = 0.5
-is_rotating_ = False
+
+target_angle_ = 0
+kP_ = 1.0
+angular_velocity_ = 0
+target_rad_ = target_angle_ * math.pi / 180
+
 regions_ = {
         'right': 0,
         'fright': 0,
@@ -38,7 +41,6 @@ regions_ = {
 state_dict_ = {
     0: 'Stopped moving',
     1: 'Moving forward',
-    2: 'Rotating',
 }
 
 
@@ -48,13 +50,13 @@ def change_state(state):
 
     global state_, state_dict_
     if state is not state_:
-        rospy.loginfo('Wall follower - [%s] - %s', state, state_dict_[state])
+        print ("Wall follower - {} - {}".format(state, state_dict_[state]))
         state_ = state
 
 
 def laserCallback(msg):
 
-    global regions_, right_wall_distance_
+    global regions_, angular_velocity_, yaw_, should_rotate_
 
     regions_ = {
         'right':  min(min(msg.ranges[0:143]), 10),
@@ -64,41 +66,27 @@ def laserCallback(msg):
         'left':   min(min(msg.ranges[576:719]), 10),
     }
 
-    right_wall_distance_ = round(regions_['right'], 2)
-
-    rospy.loginfo('Distance from wall - %f', right_wall_distance_)
+    print("DW - {} | AV - {} | Yaw - {} | SR - {}".format(regions_['right'], angular_velocity_, yaw_, should_rotate_))
 
 
 def odomCallback(msg):
 
-    global roll_, pitch_, yaw_
+    global roll_, pitch_, yaw_, angular_velocity_, should_rotate_
 
+    angular_velocity_ = msg.twist.twist.angular.z
     orientation_q = msg.pose.pose.orientation
     orientation_list = [orientation_q.x, orientation_q.y, orientation_q.z, orientation_q.w]
     (roll_, pitch_, yaw_) = euler_from_quaternion (orientation_list)
 
+    should_rotate_ = abs ( target_rad_ - yaw_ )
+
 
 #Turtlebot action methods
-
-def move_forward():
-
-    global velocity_publisher_
-
-    vel_msg = Twist()
-
-    vel_msg.linear.x = forward_speed_
-    vel_msg.linear.y = 0
-    vel_msg.linear.z = 0
-    vel_msg.angular.x = 0
-    vel_msg.angular.y = 0
-    vel_msg.angular.z = 0  
-    
-    velocity_publisher_.publish(vel_msg)
-
 
 def stop_moving():
 
     global velocity_publisher_
+
     msg = Twist()
 
     msg.linear.x = 0
@@ -106,32 +94,27 @@ def stop_moving():
     msg.linear.z = 0
     msg.angular.x = 0
     msg.angular.y = 0
-    msg.angular.z = 0.0 
-    
+    msg.angular.z = 0  
+
     velocity_publisher_.publish(msg)
 
 
-def rotate():
+def move_forward():
 
-    global target_angle_, velocity_publisher_, yaw_, kP_, is_rotating_
+    global velocity_publisher_, yaw_, kP_, target_rad_, forward_speed_
 
     msg = Twist()
 
-    is_rotating_ = True
+    msg.linear.x = forward_speed_
 
-    #Calculate the radius value
-    target_rad = target_angle_ * math.pi / 180
+    if ( abs ( target_rad_ - yaw_) > 0.001 ):
 
-    target_rad = target_angle_ * math.pi/180
-
-    if ( abs ( target_rad - yaw_) > 0.01 ):
-
-        msg.angular.z = kP_  * (target_rad - yaw_)
+        msg.angular.z = kP_  * (target_rad_ - yaw_)
     
     else:
-        
-        msg.angular.z = 0
-        is_rotating_ = False
+
+        msg.angular.z = 0.0
+
 
     velocity_publisher_.publish(msg)
 
@@ -141,7 +124,7 @@ def main():
 
     #Declare variables
 
-    global velocity_publisher_, laser_subscriber_, initial_stage_, regions_, right_wall_distance_, odom_subscriber_
+    global velocity_publisher_, laser_subscriber_, regions_, odom_subscriber_
     front_wall_distance = 0.5
     laser_max = 10.0
 
@@ -155,20 +138,16 @@ def main():
 
     odom_subscriber_ = rospy.Subscriber('/odom', Odometry, odomCallback)
 
-
-
     rate = rospy.Rate(10)
 
     #Run the node until user exists
 
     while not rospy.is_shutdown():
 
-        msg = Twist()
+        change_state(1)
+        move_forward()
 
-
-        change_state(2)
-        rotate()
-
+        
         rate.sleep()
 
 
