@@ -30,6 +30,7 @@ target_angle_ = 0
 kP_ = 1.0
 angular_velocity_ = 0
 target_rad_ = target_angle_ * math.pi / 180
+should_rotate_ = 0
 
 regions_ = {
         'right': 0,
@@ -41,6 +42,8 @@ regions_ = {
 state_dict_ = {
     0: 'Stopped moving',
     1: 'Moving forward',
+    2: "Moving right",
+    3: "Moving left",
 }
 
 
@@ -99,6 +102,37 @@ def stop_moving():
     velocity_publisher_.publish(msg)
 
 
+def move_right():
+
+    global velocity_publisher_, forward_speed_
+
+    msg = Twist()
+
+    msg.linear.x = forward_speed_
+    msg.linear.y = 0
+    msg.linear.z = 0
+    msg.angular.x = 0
+    msg.angular.y = 0
+    msg.angular.z = -0.1
+
+    velocity_publisher_.publish(msg)
+
+def move_left():
+
+    global velocity_publisher_, forward_speed_
+
+    msg = Twist()
+
+    msg.linear.x = forward_speed_
+    msg.linear.y = 0
+    msg.linear.z = 0
+    msg.angular.x = 0
+    msg.angular.y = 0
+    msg.angular.z = 0.1
+
+    velocity_publisher_.publish(msg)
+
+
 def move_forward():
 
     global velocity_publisher_, yaw_, kP_, target_rad_, forward_speed_
@@ -107,7 +141,7 @@ def move_forward():
 
     msg.linear.x = forward_speed_
 
-    if ( abs ( target_rad_ - yaw_) > 0.001 ):
+    if ( abs ( target_rad_ - yaw_) > 0.0001 ):
 
         msg.angular.z = kP_  * (target_rad_ - yaw_)
     
@@ -144,8 +178,20 @@ def main():
 
     while not rospy.is_shutdown():
 
-        change_state(1)
-        move_forward()
+        if regions_['right'] > 1.1:
+
+            change_state(2)
+            move_right()
+
+        elif regions_['right'] < 1.0:
+
+            change_state(3)
+            move_left()
+        
+        else:
+
+            change_state(1)
+            move_forward()
 
         
         rate.sleep()
