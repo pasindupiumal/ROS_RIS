@@ -74,7 +74,7 @@ def change_stage(stage):
     global stage_, stage_dict_
     if stage is not stage_:
         print ("Initiated - {}".format(stage_dict_[stage]))
-        state_ = state
+        stage_ = stage
 
 
 def laserCallback(msg):
@@ -94,7 +94,7 @@ def laserCallback(msg):
         'ten':   min(min(msg.ranges[648:719]), 10),
     }
 
-    print("DW - {} | AV - {} | Yaw - {} | SR - {}".format(regions_['three'], angular_velocity_, yaw_, should_rotate_))
+    print("DW - {} | AV - {} | Yaw - {} | SR - {}".format(regions_['one'], angular_velocity_, yaw_, should_rotate_))
 
 
 def odomCallback(msg):
@@ -133,9 +133,11 @@ def stop_moving():
 
     velocity_publisher_.publish(msg)
 
-    if  abs(angular_velocity_) < 0.0000001:
+    ang_vel = float(abs(msg.angular.z))
 
-        change_state(2)
+    if ang_vel  < 0.0001:
+        
+        change_stage(2)
 
 
 def move_right():
@@ -196,7 +198,7 @@ def go_to_door():
 
     if ( is_stopped == False ):
 
-            if regions_['three'] == 10:
+            if regions_['one'] == 10:
 
                 is_stopped = True
 
