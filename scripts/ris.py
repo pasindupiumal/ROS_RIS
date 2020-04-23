@@ -15,6 +15,11 @@ velocity_publisher_ = None
 laser_subscriber_ = None
 odom_subscriber_ = None
 
+total_distance_ = 0
+previous_x_ = 0
+previous_y_ = 0
+is_first_run_ = True
+
 forward_speed_ = 0.18
 
 current_distance_ = 0
@@ -108,8 +113,32 @@ def odomCallback(msg):
 
     should_rotate_ = abs ( target_rad_ - yaw_ )
 
+    distance_calculation(msg)
+
 
 #Turtlebot action methods
+
+def distance_calculation(msg):
+
+    global previous_x_, previous_y_, total_distance_, is_first_run_
+
+    if is_first_run_ == True:
+
+        previous_x_ = msg.pose.pose.position.x
+        previous_y_ = msg.pose.pose.position.y
+
+    current_x = msg.pose.pose.position.x
+    current_y = msg.pose.pose.position.y
+
+    distance_increment = math.hypot(current_x - previous_x_, current_y - previous_y_)
+
+    total_distance_ = total_distance_ + distance_increment
+
+    previous_x_ = current_x
+    previous_y_ = current_y
+    
+    is_first_run_ = False
+
 
 def stop_moving():
 
@@ -228,7 +257,7 @@ def main():
 
     #Declare variables
 
-    global velocity_publisher_, laser_subscriber_, regions_, odom_subscriber_, stage_
+    global velocity_publisher_, laser_subscriber_, regions_, odom_subscriber_, stage_, total_distance_
 
 
     #Initialize ros node
@@ -253,7 +282,7 @@ def main():
 
         elif ( stage_ == 2 ):
 
-            print "Started stage two"
+            print ("Total distance travelled: {}".format(total_distance_))
 
 
         rate.sleep()
