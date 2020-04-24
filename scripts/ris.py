@@ -60,6 +60,7 @@ state_dict_ = {
 stage_dict_ = {
     1: 'Stage 1',
     2: 'Stage 2',
+    3: 'Stage 3',
 }
 
 
@@ -84,7 +85,7 @@ def change_stage(stage):
 
 def laserCallback(msg):
 
-    global regions_, angular_velocity_, yaw_, should_rotate_
+    global regions_, angular_velocity_, yaw_, should_rotate_, total_distance_
 
     regions_ = {
         'one':  min(min(msg.ranges[0:71]), 10),
@@ -99,7 +100,8 @@ def laserCallback(msg):
         'ten':   min(min(msg.ranges[648:719]), 10),
     }
 
-    print("DW - {} | AV - {} | Yaw - {} | SR - {}".format(regions_['one'], angular_velocity_, yaw_, should_rotate_))
+    print("DW - {} | AV - {} | Yaw - {}".format(regions_['one'], angular_velocity_, yaw_))
+    #print("DW - {} | Yaw - {} | CD - {}".format(regions_['one'], yaw_, total_distance_))
 
 
 def odomCallback(msg):
@@ -163,15 +165,48 @@ def stop_moving():
     velocity_publisher_.publish(msg)
 
     ang_vel = float(abs(msg.angular.z))
+    lin_vel = float(abs(msg.linear.x))
 
-    if ang_vel  < 0.0001:
+    if lin_vel  < 0.001:
         
         change_stage(2)
+
+
+def adjust_yaw():
+
+    global velocity_publisher_, is_stopped, yaw_, kP_, target_rad_, angular_velocity_
+
+    msg = Twist()
+
+    msg.linear.x = 0
+    msg.linear.y = 0
+    msg.linear.z = 0
+    msg.angular.x = 0
+    msg.angular.y = 0
+
+    if ( abs ( target_rad_ - yaw_) > 0.0001 ):
+
+        msg.angular.z = kP_  * (target_rad_ - yaw_)
+    
+    else:
+
+        msg.angular.z = 0.0
+
+    velocity_publisher_.publish(msg)
+
+    ang_vel = float(abs(msg.angular.z))
+    lin_vel = float(abs(msg.linear.x))
+
+    if ang_vel  < 0.001:
+        
+        rospy.signal_shutdown("Done")
 
 
 def move_right():
 
     global velocity_publisher_, forward_speed_
+
+    ang_vel1 = -0.04
 
     msg = Twist()
 
@@ -180,7 +215,11 @@ def move_right():
     msg.linear.z = 0
     msg.angular.x = 0
     msg.angular.y = 0
-    msg.angular.z = -0.1
+    msg.angular.z = ang_vel1
+
+    while ang_vel1 < 0:
+
+        ang_vel1 = ang_vel1 + 0.01
 
     velocity_publisher_.publish(msg)
 
@@ -188,6 +227,8 @@ def move_left():
 
     global velocity_publisher_, forward_speed_
 
+    ang_vel = 0.1
+
     msg = Twist()
 
     msg.linear.x = forward_speed_
@@ -195,7 +236,8 @@ def move_left():
     msg.linear.z = 0
     msg.angular.x = 0
     msg.angular.y = 0
-    msg.angular.z = 0.1
+    msg.angular.z = ang_vel
+
 
     velocity_publisher_.publish(msg)
 
@@ -262,7 +304,7 @@ def main():
 
     #Initialize ros node
 
-    rospy.init_node('ris', anonymous=True)
+    rospy.init_node('ris', anonymous=True, disable_signals=True)
 
     velocity_publisher_ = rospy.Publisher('/cmd_vel', Twist, queue_size = 1)
 
@@ -283,6 +325,11 @@ def main():
         elif ( stage_ == 2 ):
 
             print ("Total distance travelled: {}".format(total_distance_))
+            change_stage(3)
+
+        elif ( stage_ == 3):
+
+            adjust_yaw()
 
 
         rate.sleep()
