@@ -23,6 +23,8 @@ is_first_run_ = True
 forward_speed_ = 0.18
 
 current_distance_ = 0
+current_distance_travelled_ = 0
+distance_to_travel = 0
 
 state_ = 0
 stage_ = 1
@@ -61,6 +63,8 @@ stage_dict_ = {
     1: 'Stage 1',
     2: 'Stage 2',
     3: 'Stage 3',
+    4: 'Stage 4',
+    5: 'Stage 5',
 }
 
 
@@ -71,7 +75,7 @@ def change_state(state):
 
     global state_, state_dict_
     if state is not state_:
-        print ("Wall follower - {} - {}".format(state, state_dict_[state]))
+        #print ("Wall follower - {} - {}".format(state, state_dict_[state]))
         state_ = state
 
 
@@ -79,13 +83,13 @@ def change_stage(stage):
 
     global stage_, stage_dict_
     if stage is not stage_:
-        print ("Initiated - {}".format(stage_dict_[stage]))
+        #print ("Initiated - {}".format(stage_dict_[stage]))
         stage_ = stage
 
 
 def laserCallback(msg):
 
-    global regions_, angular_velocity_, yaw_, should_rotate_, total_distance_
+    global regions_, angular_velocity_, yaw_, should_rotate_, total_distance_, current_distance_travelled_, distance_to_travel, t0_, t1_
 
     regions_ = {
         'one':  min(min(msg.ranges[0:71]), 10),
@@ -100,7 +104,7 @@ def laserCallback(msg):
         'ten':   min(min(msg.ranges[648:719]), 10),
     }
 
-    print("DW - {} | AV - {} | Yaw - {}".format(regions_['one'], angular_velocity_, yaw_))
+    print("DW - {} | AV - {} | Yaw - {} | CDT - {} | DTM - {} | T0 - {} | T1 - {}".format(regions_['one'], angular_velocity_, yaw_, current_distance_travelled_, distance_to_travel, t0_, t1_))
     #print("DW - {} | Yaw - {} | CD - {}".format(regions_['one'], yaw_, total_distance_))
 
 
@@ -167,7 +171,7 @@ def stop_moving():
     ang_vel = float(abs(msg.angular.z))
     lin_vel = float(abs(msg.linear.x))
 
-    if lin_vel  < 0.001:
+    if ang_vel  < 0.001:
         
         change_stage(2)
 
@@ -184,7 +188,7 @@ def adjust_yaw():
     msg.angular.x = 0
     msg.angular.y = 0
 
-    if ( abs ( target_rad_ - yaw_) > 0.0001 ):
+    if ( float (abs ( target_rad_ - yaw_)) > 0.001 ):
 
         msg.angular.z = kP_  * (target_rad_ - yaw_)
     
@@ -197,7 +201,7 @@ def adjust_yaw():
     ang_vel = float(abs(msg.angular.z))
     lin_vel = float(abs(msg.linear.x))
 
-    if ang_vel  < 0.001:
+    if ang_vel  < 0.00001:
         
         rospy.signal_shutdown("Done")
 
@@ -262,6 +266,69 @@ def move_forward():
     velocity_publisher_.publish(msg)
 
 
+def move_forward_by_distance(distance_to_move, degree_to_maintain, next_stage):
+
+    global forward_speed_, velocity_publisher_, t0_, t1_, current_distance_travelled_, distance_to_travel
+
+    distance_to_travel = distance_to_move
+
+    angle_in_rad = degree_to_maintain * math.pi / 180
+
+    msg = Twist()
+
+    msg.linear.x = forward_speed_
+
+    while ( current_distance_travelled_ < distance_to_move ):
+
+        if ( abs ( angle_in_rad - yaw_) > 0.0001 ):
+
+            msg.angular.z = kP_  * (angle_in_rad - yaw_)
+    
+        else:
+
+            msg.angular.z = 0.0
+
+        velocity_publisher_.publish(msg)
+
+        t1_ = rospy.Time.now().to_sec()
+
+        current_distance_travelled_ = forward_speed_ * ( t1_ - t0_)
+
+
+    msg.linear.x = 0.0
+
+    velocity_publisher_.publish(msg)
+
+    change_stage(next_stage)
+
+
+def rotate(angle):
+
+    global velocity_publisher_, yaw_, kP_
+
+    angle_in_rad = angle * math.pi / 180
+
+    msg = Twist()
+
+    if ( abs ( angle_in_rad - yaw_) > 0.0001 ):
+
+        msg.angular.z = kP_  * (angle_in_rad - yaw_)
+    
+    else:
+
+        msg.angular.z = 0.0
+
+
+    velocity_publisher_.publish(msg)
+
+
+    ang_vel = float(abs(msg.angular.z))
+
+    if ang_vel  < 0.001:
+        
+        change_stage(4)
+
+
 
 def go_to_door():
 
@@ -294,12 +361,41 @@ def go_to_door():
         stop_moving()
 
 
+def print_door_number():
+
+    global total_distance_
+
+    print ("")
+
+    if total_distance_ > 0 and total_distance_ < 2:
+
+        print ("Door 1 Detected. Total distance travelled: {}".format(total_distance_))
+
+    elif total_distance_ > 2 and total_distance_ < 4:
+
+        print ("Door 2 Detected. Total distance travelled: {}".format(total_distance_))
+    
+    elif total_distance_ > 4 and total_distance_ < 6:
+
+        print ("Door 3 Detected. Total distance travelled: {}".format(total_distance_))
+
+    elif total_distance_ > 6 and total_distance_ < 8:
+
+        print ("Door 4 Detected. Total distance travelled: {}".format(total_distance_))
+    else:
+
+        print ("Error")
+
+
+    print ("")
+
+
 
 def main():
 
     #Declare variables
 
-    global velocity_publisher_, laser_subscriber_, regions_, odom_subscriber_, stage_, total_distance_
+    global velocity_publisher_, laser_subscriber_, regions_, odom_subscriber_, stage_, total_distance_, t0_
 
 
     #Initialize ros node
@@ -324,12 +420,27 @@ def main():
 
         elif ( stage_ == 2 ):
 
-            print ("Total distance travelled: {}".format(total_distance_))
-            change_stage(3)
+            print_door_number()
+            print ("More distance to travel: {}".format(2.0 - total_distance_) )
+
+            t0_ = rospy.Time.now().to_sec()
+            move_forward_by_distance((2.0 - total_distance_), 0, 3)
+                
 
         elif ( stage_ == 3):
 
-            adjust_yaw()
+            rotate(-90)
+
+        elif (stage_ == 4):
+
+            print ("More distance to travel: 2 Meters" )
+
+            t0_ = rospy.Time.now().to_sec()
+            move_forward_by_distance(2.0, -90, 5)
+
+        elif (stage == 5):
+
+            rospy.signal_shutdown("Done")
 
 
         rate.sleep()
