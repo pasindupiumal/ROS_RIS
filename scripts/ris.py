@@ -351,7 +351,7 @@ def go_through_door():
         distance_to_final_point = regions_['south'] + 2.0
         stage4_switch_ = False
 
-    while ( regions_['south'] < distance_to_final_point ):
+    while ( regions_['south'] <= distance_to_final_point ):
 
         move_forward(-90)
 
@@ -461,8 +461,6 @@ def main():
 
         elif (stage_ == 4):
 
-            #t0_ = rospy.Time.now().to_sec()
-            #move_forward_by_distance(2.0, -90, 5)
             go_through_door()
 
         elif (stage_ == 5):
