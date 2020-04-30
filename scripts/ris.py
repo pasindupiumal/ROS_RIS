@@ -367,30 +367,29 @@ def identify_door_number():
 
         detected_door_number_ = 1
         distance_to_door_from_start_ = 2
-        print ("Door 1 Detected. Total distance travelled: {}".format(total_distance_))
-
+        
     elif total_distance_ > 2 and total_distance_ < 4:
 
         detected_door_number_ = 2
         distance_to_door_from_start_ = 4
-        print ("Door 2 Detected. Total distance travelled: {}".format(total_distance_))
     
     elif total_distance_ > 4 and total_distance_ < 6:
 
         detected_door_number_ = 3
         distance_to_door_from_start_ = 6
-        print ("Door 3 Detected. Total distance travelled: {}".format(total_distance_))
 
     elif total_distance_ > 6 and total_distance_ < 8:
 
         detected_door_number_ = 4
         distance_to_door_from_start_ = 8
-        print ("Door 4 Detected. Total distance travelled: {}".format(total_distance_))
+        
     else:
 
-        print ("Error")
+        detected_door_number_ = 0
+        distance_to_door_from_start_ = 0
 
 
+    print ("Door {} Detected. Total distance travelled: {}".format(detected_door_number_, total_distance_))
     print ("")
 
 
