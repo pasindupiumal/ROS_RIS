@@ -25,6 +25,7 @@ forward_speed_ = 0.18
 current_distance_ = 0
 current_distance_travelled_ = 0
 distance_to_travel_ = 0
+distance_to_final_point = 0
 
 state_ = 0
 stage_ = 1
@@ -34,11 +35,11 @@ t1_ = None
 
 roll_ = pitch_ = yaw_ = 0.0
 
-target_angle_ = 0
 kP_ = 1.0
 angular_velocity_ = 0
-target_rad_ = target_angle_ * math.pi / 180
+target_rad_ = 0
 stage1_switch_ = True
+stage4_switch_ = True
 detected_door_number_ = 0
 distance_to_door_from_start_ = 0
 
@@ -104,6 +105,7 @@ def laserCallback(msg):
         'eight':  min(min(msg.ranges[504:575]), 10),
         'nine':  min(min(msg.ranges[576:647]), 10),
         'ten':   min(min(msg.ranges[648:719]), 10),
+        'south':  min(min(msg.ranges[1008:1079]), 10),
     }
 
     display_telemetry_data()
@@ -126,9 +128,9 @@ def odomCallback(msg):
 
 def display_telemetry_data():
 
-    global stage_, regions_, angular_velocity_, yaw_, distance_to_travel_, current_distance_travelled_
+    global stage_, regions_, angular_velocity_, yaw_, distance_to_travel_, current_distance_travelled_, distance_to_final_point
 
-    print ("\n")
+    print("\n")
 
     if stage_ == 1:
 
@@ -140,7 +142,7 @@ def display_telemetry_data():
 
     elif stage_ == 4:
 
-        print("Distance to travel: {} | Currently travelled: {}".format(distance_to_travel_, current_distance_travelled_)),
+        print("Distance to rear wall: {} | Distance to final point: {}".format(regions_['south'], distance_to_final_point)),
         
 
 
@@ -227,9 +229,11 @@ def move_left():
     velocity_publisher_.publish(msg)
 
 
-def move_forward():
+def move_forward(target_angle):
 
     global velocity_publisher_, yaw_, kP_, target_rad_, forward_speed_
+
+    target_rad_ = target_angle * math.pi / 180
 
     msg = Twist()
 
@@ -328,12 +332,36 @@ def go_to_door():
             else:
 
                 change_state(1)
-                move_forward()
+                move_forward(0)
 
     else:
 
         change_state(0)
         stop_moving()
+
+
+def go_through_door():
+
+    global velocity_publisher_, regions_, distance_to_final_point, stage4_switch_
+
+    msg = Twist()
+
+    if stage4_switch_ == True:
+
+        distance_to_final_point = regions_['south'] + 2.0
+        stage4_switch_ = False
+
+    while ( regions_['south'] < distance_to_final_point ):
+
+        move_forward(-90)
+
+    msg.linear.x = 0
+    msg.angular.z = 0
+
+    velocity_publisher_.publish(msg)
+
+    change_stage(5)
+
 
 
 def set_final_orientation():
@@ -382,7 +410,7 @@ def identify_door_number():
 
         detected_door_number_ = 4
         distance_to_door_from_start_ = 8
-        
+
     else:
 
         detected_door_number_ = 0
@@ -433,8 +461,9 @@ def main():
 
         elif (stage_ == 4):
 
-            t0_ = rospy.Time.now().to_sec()
-            move_forward_by_distance(2.0, -90, 5)
+            #t0_ = rospy.Time.now().to_sec()
+            #move_forward_by_distance(2.0, -90, 5)
+            go_through_door()
 
         elif (stage_ == 5):
 
