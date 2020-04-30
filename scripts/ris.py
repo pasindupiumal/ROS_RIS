@@ -66,6 +66,7 @@ stage_dict_ = {
     3: 'Stage 3',
     4: 'Stage 4',
     5: 'Stage 5',
+    6: 'Stage 6',
 }
 
 
@@ -341,19 +342,19 @@ def set_final_orientation():
 
     if detected_door_number_ == 1:
 
-        rotate(-90, 5)
+        rotate(-90, 6)
 
     elif detected_door_number_ == 2:
 
-        rotate(-180, 5)
+        rotate(-180, 6)
 
     elif detected_door_number_ == 3:
 
-        rotate(90, 5)
+        rotate(90, 6)
 
     elif detected_door_number_ == 4:
 
-        rotate(0, 5)
+        rotate(0, 6)
 
 
 def identify_door_number():
@@ -439,6 +440,10 @@ def main():
         elif (stage_ == 5):
 
             set_final_orientation()
+
+        elif (stage_ == 6):
+
+            rospy.signal_shutdown("Done")
 
 
         rate.sleep()
