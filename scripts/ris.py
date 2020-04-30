@@ -84,13 +84,13 @@ def change_stage(stage):
 
     global stage_, stage_dict_
     if stage is not stage_:
-        print ("\nInitiated - {}\n".format(stage_dict_[stage]))
+        print ("\n\nInitiated - {}\n".format(stage_dict_[stage]))
         stage_ = stage
 
 
 def laserCallback(msg):
 
-    global regions_, angular_velocity_, yaw_, total_distance_, current_distance_travelled_, distance_to_travel_, t0_, t1_, stage_
+    global regions_
 
     regions_ = {
         'one':  min(min(msg.ranges[0:71]), 10),
@@ -105,8 +105,8 @@ def laserCallback(msg):
         'ten':   min(min(msg.ranges[648:719]), 10),
     }
 
+    display_telemetry_data()
 
-    print("DW - {} | AV - {} | Yaw - {} | CDT - {} | DTM - {} | T0 - {} | T1 - {}".format(regions_['one'], angular_velocity_, yaw_, current_distance_travelled_, distance_to_travel_, t0_, t1_))
 
 
 def odomCallback(msg):
@@ -122,6 +122,29 @@ def odomCallback(msg):
 
 
 #Turtlebot action methods
+
+def display_telemetry_data():
+
+    global stage_, regions_, angular_velocity_, yaw_, distance_to_travel_, current_distance_travelled_
+
+    print ("\n")
+
+    if stage_ == 1:
+
+        print("Distance to right wall: {}".format(regions_['one'])),
+
+    elif stage_ == 2:
+
+        print("Distance for the door: {} | Currently travelled: {}".format(distance_to_travel_, current_distance_travelled_)),
+
+    elif stage_ == 4:
+
+        print("Distance to travel: {} | Currently travelled: {}".format(distance_to_travel_, current_distance_travelled_)),
+        
+
+
+    print ("| Angular Velocity: {} | Yaw: {}".format(angular_velocity_, yaw_))
+
 
 def distance_calculation(msg):
 
@@ -259,7 +282,7 @@ def move_forward_by_distance(distance_to_move, degree_to_maintain, next_stage):
     change_stage(next_stage)
 
 
-def rotate(angle):
+def rotate(angle, next_stage):
 
     global velocity_publisher_, yaw_, kP_
 
@@ -278,7 +301,7 @@ def rotate(angle):
 
     velocity_publisher_.publish(msg)
 
-    change_stage(4)
+    change_stage(next_stage)
         
 
 def go_to_door():
@@ -312,11 +335,32 @@ def go_to_door():
         stop_moving()
 
 
+def set_final_orientation():
+
+    global detected_door_number_
+
+    if detected_door_number_ == 1:
+
+        rotate(-90, 5)
+
+    elif detected_door_number_ == 2:
+
+        rotate(-180, 5)
+
+    elif detected_door_number_ == 3:
+
+        rotate(90, 5)
+
+    elif detected_door_number_ == 4:
+
+        rotate(0, 5)
+
+
 def identify_door_number():
 
     global total_distance_, detected_door_number_, distance_to_door_from_start_
 
-    print ("")
+    print ("\n")
 
     if total_distance_ > 0 and total_distance_ < 2:
 
@@ -385,7 +429,7 @@ def main():
                 
         elif ( stage_ == 3):
 
-            rotate(-90)
+            rotate(-90, 4)
 
         elif (stage_ == 4):
 
@@ -394,7 +438,7 @@ def main():
 
         elif (stage_ == 5):
 
-            rospy.signal_shutdown("Done")
+            set_final_orientation()
 
 
         rate.sleep()
