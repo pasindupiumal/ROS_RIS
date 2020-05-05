@@ -26,6 +26,7 @@ current_distance_ = 0
 current_distance_travelled_ = 0
 distance_to_travel_ = 0
 distance_to_final_point = 0
+right_wall_margin_ = 1.5
 
 state_ = 0
 stage_ = 1
@@ -54,6 +55,7 @@ regions_ = {
         'eight': 0,
         'nine': 0,
         'ten': 0,
+        'south': 0,
 }
 state_dict_ = {
     0: 'Stopped moving',
@@ -105,7 +107,7 @@ def laserCallback(msg):
         'eight':  min(min(msg.ranges[504:575]), 10),
         'nine':  min(min(msg.ranges[576:647]), 10),
         'ten':   min(min(msg.ranges[648:719]), 10),
-        'south':  min(min(msg.ranges[1008:1079]), 10),
+        'south':  min(min(msg.ranges[1030:1079]), 10),
     }
 
     display_telemetry_data()
@@ -311,7 +313,9 @@ def rotate(angle, next_stage):
 
 def go_to_door():
 
-    global regions_, stage1_switch_
+    global regions_, stage1_switch_, right_wall_margin_
+
+    right_wall_margin_max = right_wall_margin_ + 0.1
 
     if ( stage1_switch_ == True ):
 
@@ -319,12 +323,12 @@ def go_to_door():
 
                 stage1_switch_ = False
 
-            if regions_['one'] > 1.1:
+            if regions_['one'] > right_wall_margin_max:
 
                 change_state(2)
                 move_right()
 
-            elif regions_['one'] < 1.0:
+            elif regions_['one'] < right_wall_margin_:
 
                 change_state(3)
                 move_left()
@@ -342,13 +346,13 @@ def go_to_door():
 
 def go_through_door():
 
-    global velocity_publisher_, regions_, distance_to_final_point, stage4_switch_
+    global velocity_publisher_, regions_, distance_to_final_point, stage4_switch_, right_wall_margin_
 
     msg = Twist()
 
     if stage4_switch_ == True:
 
-        distance_to_final_point = regions_['south'] + 2.0
+        distance_to_final_point = regions_['south'] + (right_wall_margin_  + 1.0)
         stage4_switch_ = False
 
     while ( regions_['south'] <= distance_to_final_point ):
@@ -426,7 +430,7 @@ def main():
 
     #Declare variables
 
-    global velocity_publisher_, laser_subscriber_, odom_subscriber_, stage_, total_distance_, t0_, distance_to_door_from_start_
+    global velocity_publisher_, laser_subscriber_, odom_subscriber_, stage_, total_distance_, t0_, distance_to_door_from_start_, right_wall_margin_
 
 
     #Initialize ros node
@@ -453,7 +457,14 @@ def main():
 
             identify_door_number()
             t0_ = rospy.Time.now().to_sec()
-            move_forward_by_distance((distance_to_door_from_start_ - total_distance_), 0, 3)
+
+            if (right_wall_margin_ > 1 ):
+
+                move_forward_by_distance(0.3, 0, 3)
+
+            else:
+
+                move_forward_by_distance((distance_to_door_from_start_ - total_distance_), 0, 3)
                 
         elif ( stage_ == 3):
 
